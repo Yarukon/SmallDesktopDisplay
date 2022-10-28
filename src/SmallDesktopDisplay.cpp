@@ -171,19 +171,17 @@ unsigned int localPort = 8000;
 float duty = 0;
 
 //星期
+const String wk[7] = {"周日", "周一", "周二", "周三", "周四", "周五", "周六"};
 String week()
 {
-  String wk[7] = {"日", "一", "二", "三", "四", "五", "六"};
-  String s = "周" + wk[weekday() - 1];
-  return s;
+  return wk[weekday() - 1];
 }
 
 //月日
 String monthDay()
 {
-  String s = String(month());
-  s = s + "月" + day() + "日";
-  return s;
+  String result = String(month()) + "月" + day() + "日";
+  return result;
 }
 
 /* *****************************************************************
@@ -1046,6 +1044,7 @@ void digitalClockDisplay(int reflash_en = 0)
   int now_hour = hour();     //获取小时
   int now_minute = minute(); //获取分钟
   int now_second = second(); //获取秒针
+
   //小时刷新
   if ((now_hour != Hour_sign) || (reflash_en == 1))
   {
@@ -1053,6 +1052,7 @@ void digitalClockDisplay(int reflash_en = 0)
     drawLineFont(60, timeY, now_hour % 10, 3, SD_FONT_WHITE);
     Hour_sign = now_hour;
   }
+
   //分钟刷新
   if ((now_minute != Minute_sign) || (reflash_en == 1))
   {
@@ -1060,6 +1060,7 @@ void digitalClockDisplay(int reflash_en = 0)
     drawLineFont(141, timeY, now_minute % 10, 3, SD_FONT_YELLOW);
     Minute_sign = now_minute;
   }
+
   //秒针刷新
   if ((now_second != Second_sign) || (reflash_en == 1)) //分钟刷新
   {
@@ -1070,6 +1071,7 @@ void digitalClockDisplay(int reflash_en = 0)
 
   if (reflash_en == 1)
     reflash_en = 0;
+
   /***日期****/
   clk.setColorDepth(8);
   clk.loadFont(ZdyLwFont_20);

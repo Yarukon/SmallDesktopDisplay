@@ -86,12 +86,12 @@ void savewificonfig();         // wifi ssid，psw保存到eeprom
 void readwificonfig();         //从eeprom读取WiFi信息ssid，psw
 void deletewificonfig();       //删除原有eeprom中的信息
 void getCityCode();            //发送HTTP请求并且将服务器响应通过串口输出
-void getCityWeater();          //获取城市天气
+void fetchWeather();          //获取城市天气
 void wifi_reset(Button2 &btn); // WIFI重设
 void saveParamCallback();
 void esp_reset(Button2 &btn);
 void scrollBanner();
-void weaterData(String *cityDZ, String *dataSK, String *dataFC); //天气信息写到屏幕上
+void weatherData(String *cityDZ, String *dataSK, String *dataFC); //天气信息写到屏幕上
 void refresh_AnimatedImage();                                    //更新右下角
 
 //创建时间更新函数线程
@@ -400,7 +400,7 @@ void Serial_set()
           Serial.println(cityCode);
         }
         Serial.println("");
-        getCityWeater(); //更新城市天气
+        fetchWeather(); //更新城市天气
         SMOD = "";
       }
       else
@@ -752,7 +752,7 @@ void getCityCode()
       // cityCode = str.substring(aa+4,aa+4+9).toInt();
       cityCode = str.substring(aa + 4, aa + 4 + 9);
       Serial.println(cityCode);
-      getCityWeater();
+      fetchWeather();
     }
     else
     {
@@ -770,7 +770,7 @@ void getCityCode()
 }
 
 // 获取城市天气
-void getCityWeater()
+void fetchWeather()
 {
   // String URL = "http://d1.weather.com.cn/dingzhi/" + cityCode + ".html?_="+String(now());//新
   String URL = "http://d1.weather.com.cn/weather_index/" + cityCode + ".html?_=" + String(now()); //原来
@@ -810,7 +810,7 @@ void getCityWeater()
     String jsonFC = str.substring(indexStart + 5, indexEnd);
     // Serial.println(jsonFC);
 
-    weaterData(&jsonCityDZ, &jsonDataSK, &jsonFC);
+    weatherData(&jsonCityDZ, &jsonDataSK, &jsonFC);
     Serial.println("获取成功");
   }
   else
@@ -827,7 +827,7 @@ String scrollText[7];
 // int scrollTextWidth = 0;
 
 // 天气信息写到屏幕上
-void weaterData(String *cityDZ, String *dataSK, String *dataFC)
+void weatherData(String *cityDZ, String *dataSK, String *dataFC)
 {
   // 解析第一段JSON
   DynamicJsonDocument doc(1024);
@@ -1203,9 +1203,9 @@ void WIFI_reflash_All()
     {
       Serial.println("WIFI connected");
 
-      // Serial.println("getCityWeater start");
-      getCityWeater();
-      // Serial.println("getCityWeater end");
+      // Serial.println("fetchWeather start");
+      fetchWeather();
+      // Serial.println("fetchWeather end");
 
       getNtpTime();
       //其他需要联网的方法写在后面
@@ -1352,7 +1352,7 @@ void setup()
   TJpgDec.drawJpg(15, 183, temperature, sizeof(temperature)); //温度图标
   TJpgDec.drawJpg(15, 213, humidity, sizeof(humidity));       //湿度图标
 
-  getCityWeater();
+  fetchWeather();
 #if DHT_EN
   if (DHT_img_flag != 0)
     IndoorTem();

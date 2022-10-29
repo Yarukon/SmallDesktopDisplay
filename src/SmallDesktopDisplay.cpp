@@ -1078,20 +1078,20 @@ void resetWifi(Button2 &btn)
   ESP.restart();
 }
 
-//更新时间
+// 更新时间
 void updateTime()
 {
   digitalClockDisplay();
 }
 
-//所有需要联网后更新的方法都放在这里
+// 所有需要联网后更新的方法都放在这里
 void refreshAll()
 {
   if (wifiState == 1)
   {
     if (WiFi.status() == WL_CONNECTED)
     {
-      Serial.println("WIFI connected");
+      Serial.println("WIFI Connected");
 
       fetchWeather();
       // 其他需要联网的方法写在后面
@@ -1155,7 +1155,7 @@ void setup()
 
   targetTime = millis() + 1000;
   readWifiConfig(); //读取存储的wifi信息
-  Serial.print("正在连接WIFI ");
+  Serial.print("连接至WIFI ");
   Serial.println(wificonf.stassid);
   WiFi.begin(wificonf.stassid, wificonf.stapsw);
 

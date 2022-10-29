@@ -3,23 +3,19 @@
  * SmallDesktopDisplay
  *    小型桌面显示器
  *
- * 原  作  者：Misaka
- * 修      改：微车游
- * 再次  修改：丘山鹤
- * 讨  论  群：811058758、887171863、720661626
- * 创 建 日 期：2021.07.19
- * 最后更改日期：2022.1.17
- *
- *
- * 引 脚 分 配：SCK   GPIO14
+ * 原  作  者: Misaka
+ * 修      改: 微车游
+ * 再次  修改: 丘山鹤
+ * 讨  论  群: 811058758、887171863、720661626
+ * 创 建 日 期: 2021.07.19
+ * 最后更改日期: 2022.1.17
+ * 引 脚 分 配:  SCK   GPIO14
  *              MOSI  GPIO13
  *              RES   GPIO2
  *              DC    GPIO0
  *              LCDBL GPIO5
  *
- *             增加DHT11温湿度传感器，传感器接口为 GPIO 12
- *
- *    感谢群友 @你别失望  提醒发现WiFi保存后无法重置的问题，目前已解决。详情查看更改说明！
+ *    感谢群友 @你别失望  提醒发现WiFi保存后无法重置的问题, 目前已解决。详情查看更改说明！
  * *****************************************************************/
 
 /* *****************************************************************
@@ -72,12 +68,12 @@ void printDigits(int digits);
 String num2str(int digits);
 void refreshLCD();
 
-void saveWifiConfig();        // wifi ssid，psw保存到eeprom
-void readWifiConfig();        //从eeprom读取WiFi信息ssid，psw
-void delWifiConfig();         //删除原有eeprom中的信息
+void saveWifiConfig(); // wifi ssid, psw保存到eeprom
+void readWifiConfig(); //从eeprom读取WiFi信息ssid, psw
+void delWifiConfig();  //删除原有eeprom中的信息
 
-void getCityCode();           //发送HTTP请求并且将服务器响应通过串口输出
-void fetchWeather();          //获取城市天气
+void getCityCode();  //发送HTTP请求并且将服务器响应通过串口输出
+void fetchWeather(); //获取城市天气
 
 void resetWifi(Button2 &btn); // WIFI重设
 void resetESP(Button2 &btn);
@@ -88,17 +84,19 @@ void updateBanner();
 void weatherData(String *cityDZ, String *dataSK, String *dataFC); // 天气信息写到屏幕上
 void refreshAnimatedImg();                                        // 更新右下角图片动画
 
-//创建时间更新函数线程
+// 创建时间渲染刷新函数线程
 Thread updateTimeThread = Thread();
-//创建副标题切换线程
+// 创建副标题切换线程
 Thread refreshBannerThread = Thread();
-//创建恢复WIFI链接
+// 创建恢复WIFI链接
 Thread refreshWifiThread = Thread();
-//创建动画绘制和刷新线程
+// 信息更新线程
+Thread infoRefreshThread = Thread();
+// 创建动画绘制和刷新线程
 Thread refreshAnimationThread = Thread();
 
 //创建协程池
-StaticThreadController<4> controller(&updateTimeThread, &refreshBannerThread, &refreshWifiThread, &refreshAnimationThread);
+StaticThreadController<5> controller(&updateTimeThread, &refreshBannerThread, &infoRefreshThread, &refreshWifiThread, &refreshAnimationThread);
 
 //联网后所有需要更新的数据
 Thread WIFI_reflash = Thread();
@@ -113,7 +111,7 @@ struct config_type
 };
 
 //---------------修改此处""内的信息--------------------
-//如开启WEB配网则可不用设置这里的参数，前一个为wifi ssid，后一个为密码
+//如开启WEB配网则可不用设置这里的参数, 前一个为wifi ssid, 后一个为密码
 config_type wificonf = {{"ESP8266"}, {"88888888"}};
 
 //天气更新时间  X 分钟
@@ -126,19 +124,16 @@ TFT_eSprite clk = TFT_eSprite(&tft);
 #define LCD_BL_PIN 5 // LCD背光引脚
 uint16_t bgColor = 0x0000;
 
-//其余状态标志位
-int LCD_Rotation = 0;        // LCD屏幕方向
-int LCD_BL_PWM = 50;         //屏幕亮度0-100，默认50
-uint8_t Wifi_en = 1;         // WIFI模块启动  1：打开    0：关闭
-uint8_t UpdateWeater_en = 0; //更新时间标志位
-int DHT_img_flag = 0;        // DHT传感器使用标志位
+// 状态标志
+int rotationLCD = 0;    // LCD屏幕方向
+int brightnessLCD = 50; //屏幕亮度0-100, 默认50
+uint8_t wifiState = 1;  // WIFI模块状态  1 - 打开 0 - 关闭
 
 // EEPROM参数存储地址位
-int BL_addr = 1;    //被写入数据的EEPROM地址编号  1亮度
+int BL_addr = 1;    //被写入数据的EEPROM地址编号  1 亮度
 int Ro_addr = 2;    //被写入数据的EEPROM地址编号  2 旋转方向
-int DHT_addr = 3;   // 3 DHT使能标志位
-int CC_addr = 10;   //被写入数据的EEPROM地址编号  10城市
-int wifi_addr = 30; //被写入数据的EEPROM地址编号  20wifi-ssid-psw
+int CC_addr = 10;   //被写入数据的EEPROM地址编号  10 城市
+int wifi_addr = 30; //被写入数据的EEPROM地址编号  20 wifi-ssid-psw
 
 /*** Component objects ***/
 WeatherNum wrat;
@@ -178,7 +173,7 @@ String monthDay()
  *  函数
  * *****************************************************************/
 
-// wifi ssid，psw保存到eeprom
+// wifi ssid, psw保存到eeprom
 void saveWifiConfig()
 {
   //开始写入
@@ -233,7 +228,7 @@ void drawHumidity()
   huminum = huminum / 2;
   clk.createSprite(52, 6);                         //创建窗口
   clk.fillSprite(0x0000);                          //填充率
-  clk.drawRoundRect(0, 0, 52, 6, 3, 0xFFFF);       //空心圆角矩形  起始位x,y,长度，宽度，圆弧半径，颜色
+  clk.drawRoundRect(0, 0, 52, 6, 3, 0xFFFF);       //空心圆角矩形  起始位x,y,长度, 宽度, 圆弧半径, 颜色
   clk.fillRoundRect(1, 1, huminum, 4, 2, humicol); //实心圆角矩形
   clk.pushSprite(45, 222);                         //窗口位置
   clk.deleteSprite();
@@ -246,7 +241,7 @@ void drawTemp()
 
   clk.createSprite(52, 6);                         //创建窗口
   clk.fillSprite(0x0000);                          //填充率
-  clk.drawRoundRect(0, 0, 52, 6, 3, 0xFFFF);       //空心圆角矩形  起始位x,y,长度，宽度，圆弧半径，颜色
+  clk.drawRoundRect(0, 0, 52, 6, 3, 0xFFFF);       //空心圆角矩形  起始位x,y,长度, 宽度, 圆弧半径, 颜色
   clk.fillRoundRect(1, 1, tempnum, 4, 2, tempcol); //实心圆角矩形
   clk.pushSprite(45, 192);                         //窗口位置
   clk.deleteSprite();
@@ -260,12 +255,12 @@ void SmartConfig(void)
   // tft.pushImage(0, 0, 240, 240, qr);
   tft.pushImage(0, 0, 240, 240, qr);
   Serial.println("\r\nWait for Smartconfig..."); //打印log信息
-  WiFi.beginSmartConfig();                       //开始SmartConfig，等待手机端发出用户名和密码
+  WiFi.beginSmartConfig();                       //开始SmartConfig, 等待手机端发出用户名和密码
   while (1)
   {
     Serial.print(".");
     delay(100);                 // wait for a second
-    if (WiFi.smartConfigDone()) //配网成功，接收到SSID和密码
+    if (WiFi.smartConfigDone()) //配网成功, 接收到SSID和密码
     {
       Serial.println("SmartConfig Success");
       Serial.printf("SSID:%s\r\n", WiFi.SSID().c_str());
@@ -285,10 +280,10 @@ void serialListenerUpdate()
   String incomingByte = "";
   if (Serial.available() > 0)
   {
-    while (Serial.available() > 0) //监测串口缓存，当有数据输入时，循环赋值给incomingByte
+    while (Serial.available() > 0) //监测串口缓存, 当有数据输入时, 循环赋值给incomingByte
     {
-      incomingByte += char(Serial.read()); //读取单个字符值，转换为字符，并按顺序一个个赋值给incomingByte
-      delay(2);                            //不能省略，因为读取缓冲区数据需要时间
+      incomingByte += char(Serial.read()); //读取单个字符值, 转换为字符, 并按顺序一个个赋值给incomingByte
+      delay(2);                            //不能省略, 因为读取缓冲区数据需要时间
     }
     if (SMOD == "0x01") //设置1亮度设置
     {
@@ -298,12 +293,12 @@ void serialListenerUpdate()
         EEPROM.write(BL_addr, LCDBL); //亮度地址写入亮度值
         EEPROM.commit();              //保存更改的数据
         delay(5);
-        LCD_BL_PWM = EEPROM.read(BL_addr);
+        brightnessLCD = EEPROM.read(BL_addr);
         delay(5);
         SMOD = "";
         Serial.printf("亮度调整为: ");
-        analogWrite(LCD_BL_PIN, 1023 - (LCD_BL_PWM * 10));
-        Serial.println(LCD_BL_PWM);
+        analogWrite(LCD_BL_PIN, 1023 - (brightnessLCD * 10));
+        Serial.println(brightnessLCD);
         Serial.println("");
       }
       else
@@ -329,16 +324,14 @@ void serialListenerUpdate()
           delay(5);
         }
 
-        cityCode = CityCODE;
-
         if (cityCode == "0")
         {
-          Serial.println("城市代码调整为：自动");
+          Serial.println("城市代码调整为: 自动");
           getCityCode(); //获取城市代码
         }
         else
         {
-          Serial.printf("城市代码调整为：");
+          Serial.printf("城市代码调整为: ");
           Serial.println(cityCode);
         }
         Serial.println("");
@@ -346,7 +339,7 @@ void serialListenerUpdate()
         SMOD = "";
       }
       else
-        Serial.println("城市调整错误，请输入9位城市代码，自动获取请输入0");
+        Serial.println("城市调整错误, 请输入9位城市代码, 自动获取请输入0");
     }
     if (SMOD == "0x03") //设置3屏幕显示方向
     {
@@ -359,17 +352,16 @@ void serialListenerUpdate()
         //设置屏幕方向后重新刷屏并显示
         tft.setRotation(RoSet);
         tft.fillScreen(0x0000);
-        refreshLCD(); //屏幕刷新程序
-        UpdateWeater_en = 1;
+        refreshLCD();                                               //屏幕刷新程序
         TJpgDec.drawJpg(15, 183, temperature, sizeof(temperature)); //温度图标
         TJpgDec.drawJpg(15, 213, humidity, sizeof(humidity));       //湿度图标
 
-        Serial.print("屏幕方向设置为：");
+        Serial.print("屏幕方向设置为: ");
         Serial.println(RoSet);
       }
       else
       {
-        Serial.println("屏幕方向值错误，请输入0-3内的值");
+        Serial.println("屏幕方向值错误, 请输入0-3内的值");
       }
     }
     if (SMOD == "0x04") //设置天气更新时间
@@ -379,24 +371,24 @@ void serialListenerUpdate()
       {
         updateWeatherInterval = wtup;
         SMOD = "";
-        Serial.printf("天气更新时间更改为：");
+        Serial.printf("天气更新时间更改为: ");
         Serial.print(updateWeatherInterval);
         Serial.println("分钟");
       }
       else
-        Serial.println("更新时间太长，请重新设置（1-60）");
+        Serial.println("更新时间太长, 请重新设置 (1-60)");
     }
     else
     {
       SMOD = incomingByte;
       delay(2);
       if (SMOD == "0x01")
-        Serial.println("请输入亮度值，范围0-100");
+        Serial.println("请输入亮度值, 范围0-100");
       else if (SMOD == "0x02")
-        Serial.println("请输入9位城市代码，自动获取请输入0");
+        Serial.println("请输入9位城市代码, 自动获取请输入0");
       else if (SMOD == "0x03")
       {
-        Serial.println("请输入屏幕方向值，");
+        Serial.println("请输入屏幕方向值, ");
         Serial.println("0-USB接口朝下");
         Serial.println("1-USB接口朝右");
         Serial.println("2-USB接口朝上");
@@ -404,10 +396,10 @@ void serialListenerUpdate()
       }
       else if (SMOD == "0x04")
       {
-        Serial.print("当前天气更新时间：");
+        Serial.print("当前天气更新时间: ");
         Serial.print(updateWeatherInterval);
         Serial.println("分钟");
-        Serial.println("请输入天气更新时间（1-60）分钟");
+        Serial.println("请输入天气更新时间 (分钟)");
       }
       else if (SMOD == "0x05")
       {
@@ -423,7 +415,7 @@ void serialListenerUpdate()
       else
       {
         Serial.println("");
-        Serial.println("请输入需要修改的代码：");
+        Serial.println("请输入需要修改的代码: ");
         Serial.println("亮度设置输入        0x01");
         Serial.println("地址设置输入        0x02");
         Serial.println("屏幕方向设置输入    0x03");
@@ -447,9 +439,9 @@ void Web_win()
   clk.setTextDatum(CC_DATUM); //设置文本数据
   clk.setTextColor(TFT_GREEN, 0x0000);
   clk.drawString("Failed to connect WiFi!", 100, 10, 2);
-  clk.drawString("SSID:", 45, 40, 2);
+  clk.drawString("SSID: ", 45, 40, 2);
   clk.setTextColor(TFT_WHITE, 0x0000);
-  clk.drawString("ESP8266-CONF", 125, 40, 2);
+  clk.drawString("SDD-CONF", 125, 40, 2);
   clk.pushSprite(20, 50); //窗口位置
 
   clk.deleteSprite();
@@ -482,7 +474,7 @@ void Webconfig()
                               <input type='radio' name='set_rotation' value='3'> USB接口朝左<br>";
   WiFiManagerParameter custom_rot(set_rotation); // custom html input
   WiFiManagerParameter custom_bl("LCDBL", "屏幕亮度 (1-100)", "10", 3);
-  WiFiManagerParameter custom_weatertime("WeaterUpdateTime", "天气刷新时间（分钟）", "10", 3);
+  WiFiManagerParameter custom_weatertime("WeaterUpdateTime", "天气刷新时间 ( 分钟)", "10", 3);
   WiFiManagerParameter custom_cc("CityCode", "城市代码", "0", 9);
   WiFiManagerParameter p_lineBreak_notext("<p></p>");
 
@@ -529,7 +521,7 @@ void Webconfig()
 
   bool res;
   // res = wm.autoConnect(); // auto generated AP name from chipid
-  res = wm.autoConnect("ESP8266-CONF"); // anonymous ap
+  res = wm.autoConnect("SDD-CONF"); // anonymous ap
   // res = wm.autoConnect("AutoConnectAP","password"); // password protected ap
 
   while (!res)
@@ -561,7 +553,7 @@ void delWifiConfig()
   delay(10);
 }
 
-//从eeprom读取WiFi信息ssid，psw
+//从eeprom读取WiFi信息ssid, psw
 void readWifiConfig()
 {
   uint8_t *p = (uint8_t *)(&wificonf);
@@ -592,8 +584,8 @@ void saveParamCallback()
   //将从页面中获取的数据保存
   updateWeatherInterval = getParam("WeaterUpdateTime").toInt();
   cc = getParam("CityCode").toInt();
-  LCD_Rotation = getParam("set_rotation").toInt();
-  LCD_BL_PWM = getParam("LCDBL").toInt();
+  rotationLCD = getParam("set_rotation").toInt();
+  brightnessLCD = getParam("LCDBL").toInt();
 
   //对获取的数据进行处理
   //城市代码
@@ -618,35 +610,35 @@ void saveParamCallback()
   }
 
   //屏幕方向
-  Serial.print("LCD_Rotation = ");
-  Serial.println(LCD_Rotation);
+  Serial.print("rotationLCD = ");
+  Serial.println(rotationLCD);
 
-  if (EEPROM.read(Ro_addr) != LCD_Rotation)
+  if (EEPROM.read(Ro_addr) != rotationLCD)
   {
-    EEPROM.write(Ro_addr, LCD_Rotation);
+    EEPROM.write(Ro_addr, rotationLCD);
     EEPROM.commit();
     delay(5);
   }
 
-  tft.setRotation(LCD_Rotation);
+  tft.setRotation(rotationLCD);
   tft.fillScreen(0x0000);
   Web_win();
   loadNum--;
   loading(1);
-  if (EEPROM.read(BL_addr) != LCD_BL_PWM)
+  if (EEPROM.read(BL_addr) != brightnessLCD)
   {
-    EEPROM.write(BL_addr, LCD_BL_PWM);
+    EEPROM.write(BL_addr, brightnessLCD);
     EEPROM.commit();
     delay(5);
   }
 
   // 屏幕亮度
-  Serial.printf("亮度调整为：");
-  analogWrite(LCD_BL_PIN, 1023 - (LCD_BL_PWM * 10));
-  Serial.println(LCD_BL_PWM);
+  Serial.printf("亮度调整为: ");
+  analogWrite(LCD_BL_PIN, 1023 - (brightnessLCD * 10));
+  Serial.println(brightnessLCD);
 
   // 天气更新时间
-  Serial.printf("天气更新时间调整为：");
+  Serial.printf("天气更新时间调整为: ");
   Serial.println(updateWeatherInterval);
 }
 #endif
@@ -689,7 +681,7 @@ void getCityCode()
   }
   else
   {
-    Serial.println("请求城市代码错误：");
+    Serial.println("请求城市代码错误: ");
     Serial.println(httpCode);
   }
 
@@ -743,7 +735,7 @@ void fetchWeather()
   }
   else
   {
-    Serial.println("请求城市天气错误：");
+    Serial.println("请求城市天气错误: ");
     Serial.print(httpCode);
   }
 
@@ -829,20 +821,25 @@ void weatherData(String *cityDZ, String *dataSK, String *dataFC)
   // PM2.5空气指数
   uint16_t pm25BgColor = tft.color565(156, 202, 127); //优
   String aqiTxt = "优";
+  uint16_t pm25TextCol = 0x3186;
+
   int pm25V = sk["aqi"];
   if (pm25V > 200)
   {
     pm25BgColor = tft.color565(136, 11, 32); //重度
+    pm25TextCol = 0xffff;
     aqiTxt = "重度";
   }
   else if (pm25V > 150)
   {
     pm25BgColor = tft.color565(186, 55, 121); //中度
+    pm25TextCol = 0xffff;
     aqiTxt = "中度";
   }
   else if (pm25V > 100)
   {
     pm25BgColor = tft.color565(242, 159, 57); //轻
+    pm25TextCol = 0xffff;
     aqiTxt = "轻度";
   }
   else if (pm25V > 50)
@@ -854,22 +851,21 @@ void weatherData(String *cityDZ, String *dataSK, String *dataFC)
   clk.fillSprite(bgColor);
   clk.fillRoundRect(0, 0, 50, 24, 4, pm25BgColor);
   clk.setTextDatum(CC_DATUM);
-  clk.setTextColor(0x7bef); // 50% 灰色
+  clk.setTextColor(pm25TextCol);
   clk.drawString(aqiTxt, 25, 13);
   clk.pushSprite(104, 18);
   clk.deleteSprite();
-
-  scrollText[0] = "实时天气 " + sk["weather"].as<String>();
-  scrollText[1] = "风向 " + sk["WD"].as<String>() + sk["WS"].as<String>();
 
   //天气图标
   wrat.printfweather(170, 15, atoi((sk["weathercode"].as<String>()).substring(1, 3).c_str()));
 
   //左上角滚动字幕
+  scrollText[0] = "实时天气 " + sk["weather"].as<String>();
+  scrollText[1] = "风向 " + sk["WD"].as<String>() + sk["WS"].as<String>();
+
   //解析第二段JSON
   deserializeJson(doc, *cityDZ);
   JsonObject dz = doc.as<JsonObject>();
-
   scrollText[2] = "今日" + dz["weather"].as<String>();
 
   deserializeJson(doc, *dataFC);
@@ -1008,7 +1004,6 @@ void digitalClockDisplay(int forceRefresh = 0)
 }
 
 /*-------- NTP code ----------*/
-
 const int NTP_PACKET_SIZE = 48;     // NTP时间在消息的前48字节中
 byte packetBuffer[NTP_PACKET_SIZE]; // buffer to hold incoming & outgoing packets
 
@@ -1093,23 +1088,18 @@ void updateTime()
 //所有需要联网后更新的方法都放在这里
 void refreshAll()
 {
-  if (Wifi_en == 1)
+  if (wifiState == 1)
   {
     if (WiFi.status() == WL_CONNECTED)
     {
       Serial.println("WIFI connected");
 
       fetchWeather();
-      getNtpTime();
-      //其他需要联网的方法写在后面
+      // 其他需要联网的方法写在后面
 
-      WiFi.forceSleepBegin(); // Wifi Off
-      Serial.println("WIFI sleep......");
-      Wifi_en = 0;
-    }
-    else
-    {
-      // Serial.println("WIFI disconnected");
+      WiFi.forceSleepBegin();
+      Serial.println("WIFI STATE - SLEEP");
+      wifiState = 0;
     }
   }
 }
@@ -1117,9 +1107,9 @@ void refreshAll()
 // 打开WIFI
 void openWifi()
 {
-  Serial.println("WIFI reset......");
-  WiFi.forceSleepWake(); // wifi on
-  Wifi_en = 1;
+  Serial.println("WIFI STATE - ACTIVE");
+  WiFi.forceSleepWake();
+  wifiState = 1;
 }
 
 // 强制屏幕刷新
@@ -1146,21 +1136,21 @@ void setup()
   Serial.begin(115200);
   EEPROM.begin(1024);
   // WiFi.forceSleepWake();
-  // wm.resetSettings();    //在初始化中使wifi重置，需重新配置WiFi
+  // wm.resetSettings();    //在初始化中使wifi重置, 需重新配置WiFi
 
   //从eeprom读取背光亮度设置
   if (EEPROM.read(BL_addr) > 0 && EEPROM.read(BL_addr) < 100)
-    LCD_BL_PWM = EEPROM.read(BL_addr);
+    brightnessLCD = EEPROM.read(BL_addr);
   //从eeprom读取屏幕方向设置
   if (EEPROM.read(Ro_addr) >= 0 && EEPROM.read(Ro_addr) <= 3)
-    LCD_Rotation = EEPROM.read(Ro_addr);
+    rotationLCD = EEPROM.read(Ro_addr);
 
   pinMode(LCD_BL_PIN, OUTPUT);
-  analogWrite(LCD_BL_PIN, 1023 - (LCD_BL_PWM * 10));
+  analogWrite(LCD_BL_PIN, 1023 - (brightnessLCD * 10));
 
   tft.begin();          /* TFT init */
-  tft.invertDisplay(1); //反转所有显示颜色：1反转，0正常
-  tft.setRotation(LCD_Rotation);
+  tft.invertDisplay(1); //反转所有显示颜色: 1反转, 0正常
+  tft.setRotation(rotationLCD);
   tft.fillScreen(0x0000);
   tft.setTextColor(TFT_BLACK, bgColor);
 
@@ -1200,9 +1190,9 @@ void setup()
 
   if (WiFi.status() == WL_CONNECTED)
   {
-    Serial.print("SSID:");
+    Serial.print("SSID: ");
     Serial.println(WiFi.SSID().c_str());
-    Serial.print("PSW:");
+    Serial.print("PSW: ");
     Serial.println(WiFi.psk().c_str());
     strcpy(wificonf.stassid, WiFi.SSID().c_str()); //名称复制
     strcpy(wificonf.stapsw, WiFi.psk().c_str());   //密码复制
@@ -1210,13 +1200,13 @@ void setup()
     readWifiConfig();
   }
 
-  Serial.print("本地IP： ");
+  Serial.print("本地IP: ");
   Serial.println(WiFi.localIP());
-  Serial.println("启动UDP");
+  Serial.println("启动UDP...");
   Udp.begin(localPort);
-  Serial.println("等待同步...");
+  Serial.println("NTP同步...");
   setSyncProvider(getNtpTime);
-  setSyncInterval(300);
+  setSyncInterval(800);
 
   TJpgDec.setJpgScale(1);
   TJpgDec.setSwapBytes(true);
@@ -1242,10 +1232,10 @@ void setup()
   fetchWeather();
 
   WiFi.forceSleepBegin(); // wifi off
-  Serial.println("WIFI休眠......");
-  Wifi_en = 0;
+  Serial.println("WIFI休眠...");
+  wifiState = 0;
 
-  updateTimeThread.setInterval(300); // 设置所需间隔 100毫秒
+  updateTimeThread.setInterval(300); // 设置执行间隔
   updateTimeThread.onRun(updateTime);
 
   refreshBannerThread.setInterval(3 * TMS); // 设置刷新间隔
@@ -1256,26 +1246,26 @@ void setup()
 
   refreshAnimationThread.setInterval(TMS / 25); //设置帧率
   refreshAnimationThread.onRun(refreshAnimatedImg);
+
+  infoRefreshThread.setInterval(300);
+  infoRefreshThread.onRun(refreshAll);
+
   controller.run();
 }
 
 const uint8_t *animationImg; // 指向关键帧的指针
-uint32_t animationSize; // 指向关键帧大小的指针
+uint32_t animationSize;      // 指向关键帧大小的指针
 void refreshAnimatedImg()
 {
 #if Animate_Choice
-  if (DHT_img_flag == 0)
-  {
-    imgAnim(&animationImg, &animationSize);
-    TJpgDec.drawJpg(160, 160, animationImg, animationSize);
-  }
+  imgAnim(&animationImg, &animationSize);
+  TJpgDec.drawJpg(160, 160, animationImg, animationSize);
 #endif
 }
 
 void loop()
 {
-  threadUpdate();         // 守护线程池
-  refreshAll();           // WIFI应用
+  threadUpdate();         // 线程池守护
   serialListenerUpdate(); // 串口响应
   btn.loop();             // 按钮轮询
 }

@@ -63,8 +63,6 @@ Button2 btn = Button2(4);
 void sendNTPpacket(IPAddress &address); //向NTP服务器发送请求
 time_t getNtpTime();                    //从NTP获取时间
 
-void printDigits(int digits);
-String num2str(int digits);
 void refreshLCD();
 
 void saveWifiConfig(); // wifi ssid, psw保存到eeprom
@@ -96,9 +94,6 @@ Thread refreshAnimationThread = Thread();
 
 //创建协程池
 StaticThreadController<5> controller(&updateTimeThread, &refreshBannerThread, &infoRefreshThread, &refreshWifiThread, &refreshAnimationThread);
-
-//联网后所有需要更新的数据
-Thread WIFI_reflash = Thread();
 
 /* *****************************************************************
  *  参数设置
@@ -137,7 +132,6 @@ int wifi_addr = 30; //被写入数据的EEPROM地址编号  20 wifi-ssid-psw
 /*** Component objects ***/
 WeatherNum wrat;
 
-uint32_t targetTime = 0;
 String cityCode = "101090609"; //天气城市代码
 int tempnum = 0;               //温度百分比
 int huminum = 0;               //湿度百分比
@@ -150,9 +144,8 @@ const int timeZone = 8; //东八区
 
 // wifi连接UDP设置参数
 WiFiUDP Udp;
-WiFiClient wificlient;
+WiFiClient wifiClient;
 unsigned int localPort = 8000;
-float duty = 0;
 
 //星期
 const String wk[7] = {"周日", "周一", "周二", "周三", "周四", "周五", "周六"};
@@ -209,7 +202,7 @@ void loading(byte delayTime) //绘制进度条
   clk.fillRoundRect(3, 3, loadNum, 10, 5, 0xFFFF); //实心圆角矩形
   clk.setTextDatum(CC_DATUM);                      //设置文本数据
   clk.setTextColor(TFT_GREEN, 0x0000);
-  clk.drawString("Connecting to WiFi......", 100, 40, 2);
+  clk.drawString("Connecting to WiFi...", 100, 40, 2);
   clk.setTextColor(TFT_WHITE, 0x0000);
   clk.drawRightString(Version, 180, 60, 2);
   clk.pushSprite(20, 120); //窗口位置
@@ -512,7 +505,7 @@ void Webconfig()
 
   // wifi scan settings
   // wm.setRemoveDuplicateAPs(false); // do not remove duplicate ap names (true)
-  wm.setMinimumSignalQuality(20); // set min RSSI (percentage) to show in scans, null = 8%
+  wm.setMinimumSignalQuality(20);     // set min RSSI (percentage) to show in scans, null = 8%
   // wm.setShowInfoErase(false);      // do not show erase button on info page
   // wm.setScanDispPerc(true);       // show RSSI as percentage not graph icons
 
@@ -650,7 +643,7 @@ void getCityCode()
   HTTPClient httpClient;
 
   //配置请求地址。此处也可以不使用端口号和PATH而单纯的
-  httpClient.begin(wificlient, URL);
+  httpClient.begin(wifiClient, URL);
 
   //设置请求头中的User-Agent
   httpClient.setUserAgent("Mozilla/5.0 (iPhone; CPU iPhone OS 11_0 like Mac OS X) AppleWebKit/604.1.38 (KHTML, like Gecko) Version/11.0 Mobile/15A372 Safari/604.1");
@@ -658,8 +651,8 @@ void getCityCode()
 
   //启动连接并发送HTTP请求
   int httpCode = httpClient.GET();
-  Serial.print("Send GET request to URL: ");
-  Serial.println(URL);
+  // Serial.print("Send GET request to URL: ");
+  // Serial.println(URL);
 
   //如果服务器响应OK则从服务器获取响应体信息并通过串口输出
   if (httpCode == HTTP_CODE_OK)
@@ -670,7 +663,7 @@ void getCityCode()
     if (aa > -1)
     {
       cityCode = str.substring(aa + 4, aa + 4 + 9);
-      Serial.println(cityCode);
+      // Serial.println(cityCode);
       fetchWeather();
     }
     else
@@ -697,7 +690,7 @@ void fetchWeather()
   HTTPClient httpClient;
 
   // httpClient.begin(URL);
-  httpClient.begin(wificlient, URL); //使用新方法
+  httpClient.begin(wifiClient, URL); //使用新方法
 
   //设置请求头中的User-Agent
   httpClient.setUserAgent("Mozilla/5.0 (iPhone; CPU iPhone OS 11_0 like Mac OS X) AppleWebKit/604.1.38 (KHTML, like Gecko) Version/11.0 Mobile/15A372 Safari/604.1");
@@ -870,7 +863,7 @@ void weatherData(String *cityDZ, String *dataSK, String *dataFC)
   deserializeJson(doc, *dataFC);
   JsonObject fc = doc.as<JsonObject>();
 
-  scrollText[3] = "温度" + fc["fd"].as<String>() + "℃ - " + fc["fc"].as<String>() + "℃";
+  scrollText[3] = fc["fd"].as<String>() + "℃ - " + fc["fc"].as<String>() + "℃";
 
   clk.unloadFont();
 }
@@ -973,9 +966,6 @@ void digitalClockDisplay(int forceRefresh = 0)
     secSign = secNow;
   }
 
-  if (forceRefresh == 1)
-    forceRefresh = 0;
-
   /*** 日期 ***/
   clk.setColorDepth(8);
   clk.loadFont(ZdyLwFont_20);
@@ -986,7 +976,7 @@ void digitalClockDisplay(int forceRefresh = 0)
   clk.setTextDatum(CC_DATUM);
   clk.setTextColor(TFT_WHITE, bgColor);
   clk.drawString(week(), 29, 16);
-  clk.pushSprite(102, 150);
+  clk.pushSprite(98, 150);
   clk.deleteSprite();
 
   //月日
@@ -1010,14 +1000,17 @@ time_t getNtpTime()
 {
   IPAddress ntpServerIP; // NTP server's ip address
 
+  // discard any previously received packets
   while (Udp.parsePacket() > 0)
-    ; // discard any previously received packets
-  // Serial.println("Transmit NTP Request");
+    ;
+
   //  get a random server from the pool
   WiFi.hostByName(ntpServerName, ntpServerIP);
+
   // Serial.print(ntpServerName);
   // Serial.print(": ");
   // Serial.println(ntpServerIP);
+
   sendNTPpacket(ntpServerIP);
   uint32_t beginWait = millis();
   while (millis() - beginWait < 1500)
@@ -1147,13 +1140,13 @@ void setup()
   pinMode(LCD_BL_PIN, OUTPUT);
   analogWrite(LCD_BL_PIN, 1023 - (brightnessLCD * 10));
 
-  tft.begin();          /* TFT init */
+  /* TFT init */
+  tft.begin(); 
   tft.invertDisplay(1); //反转所有显示颜色: 1反转, 0正常
   tft.setRotation(rotationLCD);
   tft.fillScreen(0x0000);
   tft.setTextColor(TFT_BLACK, bgColor);
 
-  targetTime = millis() + 1000;
   readWifiConfig(); //读取存储的wifi信息
   Serial.print("连接至WIFI ");
   Serial.println(wificonf.stassid);
@@ -1205,7 +1198,7 @@ void setup()
   Udp.begin(localPort);
   Serial.println("NTP同步...");
   setSyncProvider(getNtpTime);
-  setSyncInterval(800);
+  setSyncInterval(300);
 
   TJpgDec.setJpgScale(1);
   TJpgDec.setSwapBytes(true);

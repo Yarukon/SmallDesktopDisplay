@@ -35,7 +35,7 @@
 #include <StaticThreadController.h> //协程控制
 
 #include "config.h"                  //配置文件
-#include "weatherIcon/weatherIcon.h" //天气图库
+#include "WeatherIcon/WeatherIcon.h" //天气图库
 #include "Animate/Animate.h"         //动画模块
 
 #define Version "SDD V1.4.3 - Yarukon"
@@ -54,10 +54,10 @@ Button2 btn = Button2(4);
 /* *****************************************************************
  *  字库、图片库
  * *****************************************************************/
-#include "font/ZdyLwFont_20.h"           //字体库
-#include "font/timeClockFont.h"          //字体库
-#include "weatherIcon/img/temperature.h" //温度图标
-#include "weatherIcon/img/humidity.h"    //湿度图标
+#include "Font/ZdyLwFont_20.h"           //字体库
+#include "Font/timeClockFont.h"          //字体库
+#include "WeatherIcon/img/temperature.h" //温度图标
+#include "WeatherIcon/img/humidity.h"    //湿度图标
 
 //函数声明
 void sendNTPpacket(IPAddress &address); //向NTP服务器发送请求
@@ -132,7 +132,7 @@ int wifi_addr = 30; //被写入数据的EEPROM地址编号  20 wifi-ssid-psw
 /*** Component objects ***/
 WeatherNum wrat;
 
-String cityCode = "101090609"; //天气城市代码
+String cityCode = "0"; //天气城市代码
 int tempnum = 0;               //温度百分比
 int huminum = 0;               //湿度百分比
 int tempcol = 0xffff;          //温度显示颜色
@@ -849,7 +849,7 @@ void weatherData(String *cityDZ, String *dataSK, String *dataFC)
   clk.deleteSprite();
 
   //天气图标
-  wrat.printfweather(170, 15, atoi((sk["weathercode"].as<String>()).substring(1, 3).c_str()));
+  wrat.printfweather(166, 11, atoi((sk["weathercode"].as<String>()).substring(1, 3).c_str()));
 
   //左上角滚动字幕
   scrollText[0] = "实时天气 " + sk["weather"].as<String>();
@@ -1174,6 +1174,7 @@ void setup()
       break;
     }
   }
+
   delay(10);
   while (loadNum < 194) //让动画走完
   {
